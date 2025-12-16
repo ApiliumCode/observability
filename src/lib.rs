@@ -73,12 +73,12 @@
 //! tad log.csv
 //! ```
 
-use tracing::{Event, Subscriber};
+use tracing::Subscriber;
 use tracing_subscriber::{
-    filter::EnvFilter,
-    fmt::{format::FmtSpan, time::ChronoUtc, FmtContext},
+    fmt::format::FmtSpan,
     registry::LookupSpan,
-    FmtSubscriber,
+    EnvFilter,
+    prelude::*,
 };
 
 use std::{str::FromStr, sync::Once};
@@ -235,68 +235,72 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
             })
             .ok();
     }
-    let fm: fn(
-        ctx: &FmtContext<'_, _, _>,
-        &mut dyn std::fmt::Write,
-        &Event<'_>,
-    ) -> std::fmt::Result = format_event;
-    let fm_flame: fn(
-        ctx: &FmtContext<'_, _, _>,
-        &mut dyn std::fmt::Write,
-        &Event<'_>,
-    ) -> std::fmt::Result = format_event_flame;
-    let fm_ice: fn(
-        ctx: &FmtContext<'_, _, _>,
-        &mut dyn std::fmt::Write,
-        &Event<'_>,
-    ) -> std::fmt::Result = format_event_ice;
-
-    let subscriber = FmtSubscriber::builder()
-        .with_writer(std::io::stderr)
-        .with_target(true);
+    // Custom formatters removed for tracing-subscriber 0.3 compatibility
+    // TODO: Re-implement custom formatters using the new FormatEvent trait if needed
 
     match output {
         Output::Json => {
-            let subscriber = subscriber
-                .with_env_filter(filter)
-                .with_timer(ChronoUtc::rfc3339())
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
                 .json()
-                .event_format(fm);
-            finish(subscriber.finish())
+                .with_env_filter(filter)
+                .finish();
+            finish(subscriber)
         }
         Output::JsonTimed => {
-            let subscriber = subscriber
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
+                .with_span_events(FmtSpan::CLOSE)
+                .json()
+                .with_env_filter(filter)
+                .finish();
+            finish(subscriber)
+        }
+        Output::Log => {
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
+                .with_env_filter(filter)
+                .finish();
+            finish(subscriber)
+        }
+        Output::LogTimed => {
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
                 .with_span_events(FmtSpan::CLOSE)
                 .with_env_filter(filter)
-                .with_timer(ChronoUtc::rfc3339())
-                .json()
-                .event_format(fm);
-            finish(subscriber.finish())
-        }
-        Output::Log => finish(subscriber.with_env_filter(filter).finish()),
-        Output::LogTimed => {
-            let subscriber = subscriber.with_span_events(FmtSpan::CLOSE);
-            finish(subscriber.with_env_filter(filter).finish())
+                .finish();
+            finish(subscriber)
         }
         Output::FlameTimed => {
-            let subscriber = subscriber
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
                 .with_span_events(FmtSpan::CLOSE)
                 .with_env_filter(filter)
-                .with_timer(ChronoUtc::rfc3339())
-                .event_format(fm_flame);
-            finish(subscriber.finish())
+                .finish();
+            finish(subscriber)
         }
         Output::IceTimed => {
-            let subscriber = subscriber
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
                 .with_span_events(FmtSpan::CLOSE)
                 .with_env_filter(filter)
-                .with_timer(ChronoUtc::rfc3339())
-                .event_format(fm_ice);
-            finish(subscriber.finish())
+                .finish();
+            finish(subscriber)
         }
         Output::Compact => {
-            let subscriber = subscriber.compact();
-            finish(subscriber.with_env_filter(filter).finish())
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
+                .compact()
+                .with_env_filter(filter)
+                .finish();
+            finish(subscriber)
         }
         Output::OpenTel => {
             #[cfg(feature = "opentelemetry-on")]
@@ -304,17 +308,17 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
                 use open::OPEN_ON;
                 use opentelemetry::api::Provider;
                 OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
-                use tracing_subscriber::prelude::*;
                 open::init();
                 let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
                 let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-                finish(
-                    subscriber
-                        .with_env_filter(filter)
-                        .finish()
-                        .with(telemetry)
-                        .with(open::OpenLayer),
-                )
+                let subscriber = tracing_subscriber::fmt()
+                    .with_writer(std::io::stderr)
+                    .with_target(true)
+                    .with_env_filter(filter)
+                    .finish()
+                    .with(telemetry)
+                    .with(open::OpenLayer);
+                finish(subscriber)
             }
             #[cfg(not(feature = "opentelemetry-on"))]
             {
