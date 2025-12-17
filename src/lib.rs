@@ -91,10 +91,6 @@ mod fmt;
 pub mod metrics;
 mod open;
 
-#[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
-pub use open::channel;
-#[cfg(feature = "opentelemetry-on")]
-pub use open::should_run;
 pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
 pub use tracing;
@@ -303,27 +299,13 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
             finish(subscriber)
         }
         Output::OpenTel => {
-            #[cfg(feature = "opentelemetry-on")]
-            {
-                use open::OPEN_ON;
-                use opentelemetry::api::Provider;
-                OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
-                open::init();
-                let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-                let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-                let subscriber = tracing_subscriber::fmt()
-                    .with_writer(std::io::stderr)
-                    .with_target(true)
-                    .with_env_filter(filter)
-                    .finish()
-                    .with(telemetry)
-                    .with(open::OpenLayer);
-                finish(subscriber)
-            }
-            #[cfg(not(feature = "opentelemetry-on"))]
-            {
-                Ok(())
-            }
+            // OpenTelemetry support removed - use Log instead
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_target(true)
+                .with_env_filter(filter)
+                .finish();
+            finish(subscriber)
         }
         Output::None => Ok(()),
     }
