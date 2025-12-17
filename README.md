@@ -1,75 +1,114 @@
-# observability
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ApiliumCode/aingle/main/assets/aingle.svg" alt="AIngle Logo" width="200"/>
+</p>
 
-## Structured Contextual Logging (or tracing)
-### Why
-[Watch](https://www.youtube.com/watch?v=JjItsfqFIdo) or [Read](https://tokio.rs/blog/2019-08-tracing/)
+<h1 align="center">observability</h1>
 
-### Intention of this crate
-This crate is designed ot be a place to experiment with ideas around
-tracing and structured logging. This crate will probably never stabilize.
-Instead it is my hope to feed any good ideas back into the underlying
-dependencies.
+<p align="center">
+  <strong>Structured contextual logging and tracing for AIngle</strong>
+</p>
 
-### Usage
-There are a couple of ways to use structured logging.
-#### Console and filter
-If you want to try and filter in on an issue it might be easiest to simply log to the console and filter on what you want.
-Here's an example command:
-```bash
-RUST_LOG='core[a{something="foo"}]=debug' my_bin
+<p align="center">
+  <a href="https://crates.io/crates/observability"><img src="https://img.shields.io/crates/v/observability.svg" alt="Crates.io"/></a>
+  <a href="https://docs.rs/observability"><img src="https://docs.rs/observability/badge.svg" alt="Documentation"/></a>
+  <a href="https://github.com/ApiliumCode/observability/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/></a>
+  <a href="https://github.com/ApiliumCode/observability/actions"><img src="https://github.com/ApiliumCode/observability/workflows/CI/badge.svg" alt="CI Status"/></a>
+</p>
+
+---
+
+## Overview
+
+Structured contextual logging built on [tracing](https://docs.rs/tracing). This crate provides experimental observability features for AIngle distributed systems, including console output, JSON logging, and span filtering.
+
+## Features
+
+- **Structured logging** - Context-aware log events with spans
+- **Multiple outputs** - Console, JSON, and custom formatters
+- **Powerful filtering** - Filter by module, span, or field values
+- **Zero-cost abstractions** - Disabled spans compile to no-ops
+
+## Installation
+
+```toml
+[dependencies]
+observability = "0.1"
 ```
-Or a more simple version using the default `Log`:
+
+## Quick Start
+
+### Console Logging
+
 ```bash
-RUST_LOG=trace my_bin
+# Simple logging
+RUST_LOG=trace cargo run
+
+# Filtered logging
+RUST_LOG='core[a{something="foo"}]=debug' cargo run
 ```
-##### Types of tracing
-There are many types of tracing exposed by this crate.
-The [Output] type is designed to be used with something like [structopt](https://docs.rs/structopt/0.3.20/structopt/)
-so you can easily set which type you want with a command line arg.
-You could also use an environment variable.
-The [Output] variant is passing into the [init_fmt] function on start up.
-##### Filtering
+
+### JSON Output
+
 ```bash
+RUST_LOG='core[{}]=debug' cargo run --structured Json > log.json
+```
+
+### Filter Syntax
+
+```bash
+# Module + span + field filtering
 RUST_LOG='core[a{something="foo"}]=debug'
-```
-Here we are saying show me all the events that are:
-- In the `core` module
-- Inside a span called `a`
-- The span `a` has to have a field called `something` that is equal to `foo`
-- They are at least debug level.
 
-Most of these options are optional.
-They can be combined like:
-```bash
+# Multiple filters
 RUST_LOG='[{}]=error,[{something}]=debug'
 ```
-> The above means show me errors from anywhere but also any event or span with the field something that's at least debug.
 
-[See here](https://docs.rs/tracing-subscriber/0.2.2/tracing_subscriber/filter/struct.EnvFilter.html) for more info.
+| Component | Description |
+|-----------|-------------|
+| `core` | Module path filter |
+| `[a]` | Span name filter |
+| `{field="value"}` | Field value filter |
+| `=debug` | Minimum log level |
 
-##### Json
-Sometimes there's too much data and it's better to capture it to interact with using another tool later.
-For this we can output everything as Json using the flag `--structured Json`.
-Then you can pipe the output from stdout to you're file of choice.
-Here's some sample output:
+## JSON Output
+
 ```json
-{"time":"2020-03-03T08:07:05.910Z","name":"event crates/sim2h/src/sim2h_im_state.rs:695","level":"INFO","target":"sim2h::sim2h_im_state","module_path":"sim2h::sim2h_im_state","file":"crates/sim2h/src/sim2h_im_stat
-e.rs","line":695,"fields":{"space_hashes":"[]"},"spans":[{"id":[1099511627778],"name":"check_gossip","level":"INFO","target":"sim2h::sim2h_im_state","module_path":"sim2h::sim2h_im_state","file":"crates/sim2h/src/s
-im2h_im_state.rs","line":690}]}
+{
+  "time": "2024-01-01T00:00:00.000Z",
+  "name": "event",
+  "level": "INFO",
+  "target": "my_module",
+  "file": "src/lib.rs",
+  "line": 42,
+  "fields": {"message": "Hello"},
+  "spans": [{"name": "request", "id": 1}]
+}
 ```
-Every log will include the above information expect for the spans which will only show up if there are parent spans in the context of the event.
 
-You can combine filter with Json as well.
+## Useful Tools
 
-###### Tools
-Some useful tools for formatting and using the json data.
-- [json2csv](https://www.npmjs.com/package/json2csv)
-- [jq](https://stedolan.github.io/jq/)
-- [tad](https://www.tadviewer.com/)
+| Tool | Purpose |
+|------|---------|
+| [jq](https://stedolan.github.io/jq/) | JSON processing |
+| [json2csv](https://www.npmjs.com/package/json2csv) | Convert to CSV |
+| [tad](https://www.tadviewer.com/) | CSV viewer |
 
-A sample workflow:
-```bash
-RUST_LOG='core[{}]=debug' my_bin --structured Json > log.json
-cat out.json | jq '. | {time: .time, name: .name, message: .fields.message, file: .file, line: .line, fields: .fields, spans: .spans}' | json2csv -o log.csv
-tad log.csv
-```
+## Resources
+
+- [Why Tracing? (Video)](https://www.youtube.com/watch?v=JjItsfqFIdo)
+- [Tokio Tracing Blog](https://tokio.rs/blog/2019-08-tracing/)
+- [EnvFilter Documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
+
+## Part of AIngle
+
+This crate is part of the [AIngle](https://github.com/ApiliumCode/aingle) ecosystem - a Semantic DAG framework for IoT and distributed AI applications.
+
+## License
+
+Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <sub>Maintained by <a href="https://apilium.com">Apilium Technologies</a> - Tallinn, Estonia</sub>
+</p>
